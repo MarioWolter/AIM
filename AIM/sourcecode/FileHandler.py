@@ -1741,7 +1741,7 @@ class RunParameters:
             "ARG", "HIS", "LYS", "ASP", "GLU", "SER", "THR", "ASN", "GLN",
             "CYS", "GLY", "PRO", "ALA", "VAL", "ILE", "LEU", "MET", "PHE",
             "TYR", "TRP"]
-        resnames_protein_special = ["FOR", "ETA", "GL2"]
+        resnames_protein_special = ["FOR", "ETA", "GL2","ACE","NME"]
 
         if self.use_protein_specials:
             resnames_Protein += resnames_protein_special
@@ -2105,8 +2105,7 @@ class ExtraMapReader:
             not all(k in self.functions for k in (
                 "set_references",
                 "set_use_G", "set_relevant_j", "local_finder", "pre_calc",
-                "pre_frame", "post_frame", "post_calc", "calc_freq",
-                "calc_dipole"
+                "pre_frame", "calc_freq", "calc_dipole"
             ))
         ):
             warnitems.append("all required python functions")

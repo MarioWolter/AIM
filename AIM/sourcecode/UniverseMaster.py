@@ -194,7 +194,7 @@ class Universe:
             # just like some atom names MUST indicate the beginning of a new
             # chain
             if (
-                resname in ["FOR"]
+                resname in ["FOR","ACE"]
                 or
                 any(
                     self.atnames[ix] in RunPar.atnames["TermH"]
@@ -212,7 +212,7 @@ class Universe:
             # Similarly, some residue names MUST be the end of a chain, just
             # like some atom names MUST indicate the beginning of a new chain
             if(
-                resname in ["ETA", "GL2"]
+                resname in ["ETA", "GL2", "NME"]
                 or
                 any(
                     self.atnames[ix] in RunPar.atnames["TermO"]
@@ -509,7 +509,7 @@ class Universe:
                 self.residues.start[molres[0]],
                 self.residues.fin[molres[0]]+1
             ):
-                if self.resnames[atomnum] in ["FOR"]:
+                if self.resnames[atomnum] in ["FOR","ACE"]:
                     dict_of_cycles[molnum] = False
                     break
                 if self.atnames[atomnum] in RunPar.atnames["TermH"]:
@@ -521,7 +521,7 @@ class Universe:
                 self.residues.start[molres[-1]],
                 self.residues.fin[molres[-1]]+1
             ):
-                if self.resnames[atomnum] in ["ETA", "GL2"]:
+                if self.resnames[atomnum] in ["ETA", "GL2", "NME"]:
                     dict_of_cycles[molnum] = False
                     break
                 if self.atnames[atomnum] in RunPar.atnames["TermO"]:
@@ -545,10 +545,6 @@ class Universe:
                 (n_res-1+dict_of_cycles[molnum], 6),
                 dtype='int32'
             )
-            found_atoms = np.ones(
-                (n_res - 1 + dict_of_cycles[molnum], 6),
-                dtype='int32'
-            )
 
             # now, fill the array with atoms:
             for locresnum, resnum in enumerate(molres):
@@ -565,68 +561,35 @@ class Universe:
                         # save the atoms. 0->C_x, 1->O_x, 2->CA_x
                         if atname in RunPar.atnames["C"]:
                             relevant_atoms[locresnum, 0] = atnum
-                            found_atoms[locresnum, 0] = 0
                         elif atname in RunPar.atnames["O"]:
                             relevant_atoms[locresnum, 1] = atnum
-                            found_atoms[locresnum, 1] = 0
                         elif atname in RunPar.atnames["CA"]:
                             relevant_atoms[locresnum, 2] = atnum
-                            found_atoms[locresnum, 2] = 0
                         elif resname == "FOR":
                             if atname == "H":
                                 relevant_atoms[locresnum, 2] = atnum
-                                found_atoms[locresnum, 2] = 0
-
                     # if it is not the first residue of linear chain
                     if locresnum != 0 or dict_of_cycles[molnum]:
                         # save the atoms. 3->N_x+1, 4->H_x+1 (or CD_x+1),
                         # 5->CA_x+1
                         if atname in RunPar.atnames["N"]:
                             relevant_atoms[locresnum-1, 3] = atnum
-                            found_atoms[locresnum-1, 3] = 0
                         elif atname in RunPar.atnames["H"]:
                             relevant_atoms[locresnum-1, 4] = atnum
-                            found_atoms[locresnum-1, 4] = 0
                         elif atname in RunPar.atnames["CA"]:
                             relevant_atoms[locresnum-1, 5] = atnum
-                            found_atoms[locresnum-1, 5] = 0
                         elif resname == "ETA":
                             if atname == "C2":
                                 relevant_atoms[locresnum-1, 5] = atnum
-                                found_atoms[locresnum-1, 5] = 0
                         elif resname == "GL2":
                             if atname == "H1":
                                 relevant_atoms[locresnum-1, 4] = atnum
-                                found_atoms[locresnum-1, 4] = 0
                             if atname == "H2":
                                 relevant_atoms[locresnum-1, 5] = atnum
-                                found_atoms[locresnum-1, 5] = 0
                         if resname == "PRO":
                             if atname == "CD":
                                 relevant_atoms[locresnum-1, 4] = atnum
-                                found_atoms[locresnum-1, 4] = 0
             dict_of_BBCOatoms[molnum] = relevant_atoms
-
-            if np.sum(found_atoms) != 0:
-                problem_atoms = np.sum(found_atoms, axis=0)
-                problem_dict = {
-                    0: "C", 1: "O", 2: "CA", 3: "N", 4: "H", 5: "CA"
-                }
-                problem_txt = ", ".join([
-                    problem_dict[ix] for ix, summed in enumerate(problem_atoms)
-                    if summed != 0
-                ])
-                ErrorText = (
-                    "Chain " + str(molnum) + " containing residues " +
-                    str(molres[0]) + " - " + str(molres[-1]) +
-                    " contains " + str(np.sum(found_atoms)) +
-                    " atoms which are needed for amide groups, but could " +
-                    "not be identified. These atoms are of type " + problem_txt
-                    + ". If you are missing many atoms of a single type, "
-                    "please check if your atoms have the same name as reported"
-                    " in the used atnames file. Quitting!"
-                )
-                AIM_PC.warning(ErrorText, True, 0, logfilename, RunPar)
 
         return dict_of_BBCOatoms, dict_of_cycles
 
@@ -884,7 +847,7 @@ class Universe:
         function_warning = 0
         self.PreCalc(TIMER, FILES, RunPar)
 
-        for frame in self.trj[RunPar.start_frame:]:
+        for frame in self.trj:
             # if frame number is too large, quit.
             self.framenum = frame.frame
             if self.framenum < RunPar.start_frame:
@@ -913,8 +876,6 @@ class Universe:
             # if anything needs to happen to the map on a per-frame basis.
             for exmap in RunPar.ExtraMaps.values():
                 exmap.functions["pre_frame"](FILES, RunPar, self, exmap)
-            for coupmap in RunPar.CouplingMaps.values():
-                coupmap.functions["pre_frame"](FILES, RunPar, self, coupmap)
 
             AIM_PC.vprint(
                 4, ("Frame initialization complete, starting calculating "
@@ -925,11 +886,6 @@ class Universe:
                 4,
                 "finished calculating Hamiltonian, writing ham to file",
                 FILES.logfilename, RunPar)
-
-            for exmap in RunPar.ExtraMaps.values():
-                exmap.functions["post_frame"](FILES, RunPar, self, exmap)
-            for coupmap in RunPar.CouplingMaps.values():
-                coupmap.functions["post_calc"](FILES, RunPar, self, coupmap)
 
             FILES.WriteOutput(RunPar, self)
 
@@ -1316,13 +1272,6 @@ class Universe:
 
         totaloftype = AIM_PC.finprint_composition(FILES, RunPar, self)
 
-        AIM_PC.vprintl(1, ["\n", "\nNotes from maps:"], FILES.logfilename, RunPar)
-
-        for exmap in RunPar.ExtraMaps.values():
-            exmap.functions["post_calc"](FILES, RunPar, self, exmap)
-        for coupmap in RunPar.CouplingMaps.values():
-            coupmap.functions["post_calc"](FILES, RunPar, self, coupmap)
-
         AIM_PC.finprint_frames(FILES, RunPar, self)
 
         AIM_PC.finprint_time(FILES, RunPar, self, TIMER)
@@ -1487,7 +1436,7 @@ class ResidueFinder:
         """
         Determines whether a protein residue is in D- or L-configuration.
         """
-        if self.resnames[resnum] in ["GLY", "FOR", "ETA", "GL2"]:
+        if self.resnames[resnum] in ["GLY", "FOR", "ETA", "GL2", "NME", "ACE"]:
             returnval = 0
         else:
             resstart = self.start[resnum]
